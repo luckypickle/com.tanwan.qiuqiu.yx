@@ -50,6 +50,13 @@ var CACHE = {
         },
         roundMonsterCount:0,
         currentRound:0,
+        totalStar:0,
+        Monster:[],
+        MonsterShowTime:-1,
+        MonsterSafeInterval:4000,
+        MonsterMergeCount:7,
+        MonsterCurrentCount:20,
+        spCanMergeBall:true,
         
     },
     'ads_can': {},
@@ -63,6 +70,7 @@ var CACHE = {
         'getRewardAdvertType': 4,  // 支援宝箱
         'missionAdvertType': 5,  // 任务
         'legionContributeAdvertType': 6,  // 球队捐献广告
+        'miaoshoudianjin':14,//妙手点金广告
         'shopAdvertLimit': false, // 商店广告限制
         'hasVideoAdsBuff': false, // 竞技BUFF
         'cooperateAdvertLimit': true // 合作广告限制
@@ -76,7 +84,17 @@ var CACHE = {
     '_noticeList': [], // 通用广告
     '_cheapPackIsOpen': false, // 1元礼包。6元礼包
     '_cheapPackData': [], // 1元礼包。6元礼包
-    'NotMergeCount':12,
+    'NotMergeCount':7,
+    'startCollect':true,
+    'startPVPGame':true,
+    'postData':[],
+    'openCount':0,
+    'autoWatchAD':true,
+    'autoWatchTeamAD':false,
+    'isVerify':false,
+    'verifyOptions':[],
+    'verifyQuestion':'',
+    'verifyCache':{},
 };
 
 // 读入文件到缓存
@@ -133,12 +151,12 @@ CACHE.getBallMergeId = function(ballId, isKillBall) {
     var ballList = CACHE.battle.self.ballList;
 
     // 不合并 - 七星球球
-    if(mergeFromObj.star >= 7 ||mergeFromObjIsNotMerge||mergeFromObj.ballType === 40 ) {
+    if(mergeFromObj.star >= 7 ||mergeFromObjIsNotMerge||mergeFromObj.ballType === 40||mergeFromObj.ballType ===51 ) {
 
         if(mergeFromObj.star>=7 && mergeFromObj.ballType ===44 ){
             var canMergeList = Object.values(ballList).filter((ballItem) =>{
                 if(ballId !== ballItem.ballId){
-                    if(ballItem.star === mergeFromObj.star && gameData.BattleConst.notMerge.includes(ballItem.ballType) ) {
+                    if(ballItem.star === mergeFromObj.star && (gameData.BattleConst.notMerge.includes(ballItem.ballType) || CACHE.battle.battleType == 1)  && ballItem.ballType !== 32) {
                         return true;
                     }
 
@@ -187,13 +205,26 @@ CACHE.getBallMergeId = function(ballId, isKillBall) {
                 if(mergeFromObj.ballType==44 && ballItem.ballType === 40){
                     return false
                 }
+                if(mergeFromObj.ballType==51 && ballItem.ballType === 51){
+                    return false
+                }
                 if(mergeFromObj.ballType==39 && ballItem.ballType === 40){
                     return false
                 }
+                if(CACHE.battle.currentRound>200 &&(mergeFromObj.ballType === 39 || ballItem.ballType === 39)){
+                    if(mergeFromObj.ballType === 35 || ballItem.ballType === 35){
+                        return false;
+                    }
+                    if(mergeFromObj.star===6){
+                        return false;
+                    }
+                        
+                }
+                
                 // 非暗杀
                 if(!isKillBall) {
                     // 生长球球，不相互合并
-                    if(mergeFromObj.ballType === 32 && ballItem.ballType === 32) {
+                    if(mergeFromObj.ballType === 32 && ballItem.ballType === 32&&mergeFromObj.star !==6) {
                         return false;
                     }
                     // 复制球球，不相互复制合并
@@ -216,12 +247,25 @@ CACHE.getBallMergeId = function(ballId, isKillBall) {
     });
     if(canMergeList.length > 0) {
         canMergeList.sort( (a, b) => {
-            if (gameData.BattleConst.notMerge.includes(a.ballType)){
-                return -1000;
+            if (CACHE.battle.currentRound<200){
+                if(a.ballType === 35){
+                    return -2000;
+                }
+                if(b.ballType === 35){
+                    return 2000;
+                }
             }
-            if (gameData.BattleConst.notMerge.includes(b.ballType)){
-                return 1000;
+            else{
+                if (gameData.BattleConst.notMerge.includes(a.ballType)){
+                    return -1000;
+                }
+                if (gameData.BattleConst.notMerge.includes(b.ballType)){
+                    return 1000;
+                }
             }
+           
+
+
             var aBallObj = gameData.getBallObj(a.ballType);
             var bBallObj = gameData.getBallObj(b.ballType);
             a.weight = gameData.BattleConst.featureWeight[ aBallObj.featureType ];
@@ -249,9 +293,18 @@ CACHE.getUnMergeBallId = function(ballId) {
     // 成长球球 非暗杀模式，还是会尝试抢救！32.成长 44.复制
     // 只处理UnMergeBallList 和召唤球 40召唤 notMerge 大于6个才合并
     var TmpballList = Object.values(ballList).filter((ballItem) =>{
-        return gameData.BattleConst.notMerge.includes(ballItem.ballType);
+        return gameData.BattleConst.notMerge.includes(ballItem.ballType) && ballItem.ballType !==32;
        
     }   );
+    var totalStar = 0
+    for(var i =0;i<TmpballList.length;i++){
+        totalStar += TmpballList[i].star
+    }
+    CACHE.battle.totalStar = totalStar;
+    // 星级除以4 为可接受怪物数
+    if(mergeFromObj.ballType ===40 && totalStar/5<CACHE.battle.runUnMergeCount){
+        return ;
+    }
      var mergeNotMerge = false
     if (TmpballList.length>CACHE.NotMergeCount){
         mergeNotMerge = true
@@ -272,7 +325,7 @@ CACHE.getUnMergeBallId = function(ballId) {
         var result = false;
         if(ballId !== ballItem.ballId ) {
             // （万能球 或 相同球） 且 星星相同
-			if(TmpballList.length<6 && ballItem.star>=3 && ballItem.ballType==40){
+			if(totalStar/4 <(CACHE.battle.runUnMergeCount+4) && ballItem.star>=3 && ballItem.ballType==40){
 				return false;
             }
 
@@ -280,6 +333,10 @@ CACHE.getUnMergeBallId = function(ballId) {
                  // 生长球球，不相互合并
                  if(mergeFromObj.ballType === 32 && ballItem.ballType === 32) {
                     return false;
+                }
+                //妖精不合球
+                if(mergeFromObj.ballType==51 && ballItem.ballType === 51){
+                    return false
                 }
                 // 复制球球，不相互复制合并
                 if(mergeFromObj.ballType === 44 && ballItem.ballType === 44) {
@@ -313,16 +370,186 @@ CACHE.getUnMergeBallId = function(ballId) {
 };
 
 
+
+CACHE.getKillBallMergeId =function(ballId) {
+    var mergeFromObj = CACHE.getBallById(ballId);
+    var mergeFromObjIsKillBall = gameData.BattleConst.killBall.includes(mergeFromObj.ballType); // 合并球球是否万能球球
+    var mergeToObj = null;
+    var ballList = CACHE.battle.self.ballList;
+
+
+    // 不合并 - 七星球球
+    if(mergeFromObj.star >= 7) {
+        return;
+    }
+    // 成长球球 非暗杀模式，还是会尝试抢救！32.成长 44.复制
+    if(!mergeFromObjIsKillBall){
+        return;
+    }
+
+
+
+    var canMergeList = Object.values(ballList).filter((ballItem) => {
+        var result = false;
+        if(ballId !== ballItem.ballId ) {
+            // （万能球 或 相同球） 且 星星相同
+		
+
+            if(ballItem.star === mergeFromObj.star) {
+                 // 生长球球，不相互合并
+                 if(mergeFromObj.ballType === 32 && ballItem.ballType === 32) {
+                    return false;
+                }
+                // 复制球球，不相互复制合并
+                if(mergeFromObj.ballType === 44 && ballItem.ballType === 44) {
+                    return false;
+                }
+                    var mergeToObjIsAllPowerfulBall = gameData.BattleConst.allPowerful.includes(ballItem.ballType);
+                    if(mergeToObjIsAllPowerfulBall){
+                        result = true;
+                    }
+                    if(ballItem.ballType === mergeFromObj.ballType) {
+                        result = true;
+                    }
+                }
+            
+            }
+        return result;
+    });
+
+    
+    if(canMergeList.length > 0) {
+        canMergeList.sort( (a, b) => {
+            var aweight = a.star
+            var bweight = b.star
+           
+            return aweight - bweight;
+        });
+        mergeToObj = canMergeList[0];
+    }
+
+    return mergeToObj;
+};
+
+
+CACHE.getLessUnMergeBallId = function(ballId) {
+    var mergeFromObj = CACHE.getBallById(ballId);
+    var mergeFromObjIsAllPowerfulBall = gameData.BattleConst.allPowerful.includes(mergeFromObj.ballType); // 合并球球是否万能球球
+    var mergeToObj = null;
+    var ballList = CACHE.battle.self.ballList;
+    var isNotMerge = gameData.BattleConst.notMerge.includes(mergeFromObj.ballType); 
+    var issummoner = mergeFromObj.ballType ===40;
+
+    // 不合并 - 七星球球
+    if(mergeFromObj.star >= 7 || mergeFromObj.ballType==51) {
+        return;
+    }
+    // 成长球球 非暗杀模式，还是会尝试抢救！32.成长 44.复制
+    // 只处理UnMergeBallList 和召唤球 40召唤 notMerge 大于6个才合并
+    var TmpballList = Object.values(ballList).filter((ballItem) =>{
+        return gameData.BattleConst.notMerge.includes(ballItem.ballType) && ballItem.ballType !==32;
+       
+    }   );
+    var totalStar = 0
+    if (TmpballList.length>3){
+        return;
+    }
+    if(CACHE.battle.currentRound%2 !=0){
+        return;
+    }
+    if(CACHE.battle.currentRound<800&& CACHE.battle.Monster.lenght <1){
+        return;
+    }
+    if(CACHE.battle.currentRound<800&& CACHE.battle.Monster[0] == 104){
+        return;
+    }
+    if(CACHE.battle.currentRound>=800&& CACHE.battle.Monster.length<2){
+        return;
+    }
+    if(CACHE.battle.currentRound>=800&& (CACHE.battle.Monster[0]==104||CACHE.battle.Monster[1]==104)){
+        return;
+    }
+
+    var mergeNotMerge = false
+    if (TmpballList.length>CACHE.NotMergeCount){
+        mergeNotMerge = true
+
+    }
+    //不是召唤球也不在不可合成列表里
+    if(isNotMerge && !mergeNotMerge){
+        return;
+    }
+
+    var canMergeList = Object.values(ballList).filter((ballItem) => {
+        var result = false;
+        if(ballId !== ballItem.ballId ) {
+            // （万能球 或 相同球） 且 星星相同
+
+            if(ballItem.star === mergeFromObj.star) {
+                 // 生长球球，不相互合并
+                 if(mergeFromObj.ballType === 32 && ballItem.ballType === 32 &&mergeFromObj.star !==6) {
+                    return false;
+                }
+                //妖精不合球
+                if(mergeFromObj.ballType==51 && ballItem.ballType === 51){
+                    return false
+                }
+
+                    var mergeToObjIsAllPowerfulBall = gameData.BattleConst.allPowerful.includes(ballItem.ballType);
+                    if(mergeToObjIsAllPowerfulBall){
+                        result = true;
+                    }
+                    if(ballItem.ballType === mergeFromObj.ballType) {
+                        result = true;
+                    }
+                }
+            
+            }
+        return result;
+    });
+
+    
+    if(canMergeList.length > 0) {
+        canMergeList.sort( (a, b) => {
+            var aweight = a.ballType ===40? 10+a.star:a.star;
+            var bweight = b.ballType ===40? 10+b.star:b.star;
+            if ( a.ballType === 44){
+                aweight+=20;
+            }
+            if ( b.ballType === 44){
+                bweight+=20;
+            }
+           
+            return aweight - bweight;
+        });
+        mergeToObj = canMergeList[0];
+    }
+
+    return mergeToObj;
+};
+
+
 // 排序球球列表 - 根据 球球星星
 CACHE.getBallKeysSort = function() {
     var ballList = Object.values(CACHE.battle.self.ballList);
     ballList.sort((a, b) => {
         // 暗杀大师 优先升级低星球球
+
         if(CACHE.battle.bossTrailer == 105) {
             return a.star - b.star; // 排序：低到高 - 升序
         } else {
-            return b.star - a.star; // 排序：高到低 - 降序
+            return a.star - b.star; // 排序：高到低 - 降序
         }
+    });
+    return ballList.map( (ballItem) => ballItem.ballId); // 取球球实例 ID 数组
+};
+
+// 排序球球列表 - 根据 球球星星
+CACHE.getUnMergeBallKeysSort = function() {
+    var ballList = Object.values(CACHE.battle.self.ballList);
+    ballList.sort((a, b) => {
+        // 暗杀大师 优先升级低星球球
+        return a.star - b.star; // 排序：低到高 - 升序
     });
     return ballList.map( (ballItem) => ballItem.ballId); // 取球球实例 ID 数组
 };

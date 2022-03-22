@@ -20,3 +20,71 @@ app.get('/', function (req, res) {
 
 // api
 app.post('/api.php', api);
+
+app.get('/startcollect',function(req, res){
+    CACHE.startCollect=true;
+    res.send("success");
+})
+
+app.get('/stopcollect',function(req, res){
+    CACHE.startCollect=false;
+    res.send("success");
+
+})
+
+
+app.get('/startpvp',function(req, res){
+    CACHE.startPVPGame=true;
+    res.send("success");
+})
+
+app.get('/stoppvp',function(req, res){
+    CACHE.startPVPGame=false;
+    res.send("success");
+
+})
+
+app.get('/watchAD',function(req, res){
+    CACHE.postData.push('server.rpc_server_video_ads_click_watch(1,0);');
+    res.send("success");
+
+})
+
+app.get('/openBox',function(req,res){
+
+    CACHE.openCount += parseInt(req.query.count);
+
+    res.send('success');
+})
+
+
+app.get('/autoWatch',function(req,res){
+  
+    CACHE.autoWatchAD = true;
+
+    res.send('success');
+})
+
+app.get('/stopautoWatch',function(req,res){
+  
+    CACHE.autoWatchAD = false;
+
+    res.send('success');
+})
+
+app.get('/autoWatchTeam',function(req,res){
+  
+    CACHE.autoWatchTeamAD = true;
+
+    res.send('success');
+})
+
+app.get('/stopautoWatchTeam',function(req,res){
+  
+    CACHE.autoWatchTeamAD = false;
+
+    res.send('success');
+})
+app.get('/question',function(req,res){
+    res.send(CACHE.verifyCache);
+})

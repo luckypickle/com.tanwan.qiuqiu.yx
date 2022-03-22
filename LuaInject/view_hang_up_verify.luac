@@ -1,0 +1,180 @@
+local BasePopLayer = require("ui.base.base_pop_layer")
+local ViewHangUpVerify = class("ViewHangUpVerify", BasePopLayer)
+
+local HangUpData = require("module.pto_data.hang_up_data")
+
+local LEVEL_MIN = 5
+local OPTIONS_NUM = 4
+
+local RES = {
+    [1] = "sprite/verify/verify_option_normal.png",
+    [2] = "sprite/verify/verify_option_select.png",
+}
+
+HangUpData.ins = nil
+
+function ViewHangUpVerify:initCfg()
+    self.csbPath = "csb/view_node/view_hang_up_verify.csb"
+    self.uniqueName = "ViewHangUpVerify"
+    self.isInitAllWidget = true
+    self.isTouchOutSideClose = false
+end
+
+function ViewHangUpVerify:initView()
+end
+
+function ViewHangUpVerify:initEvent()
+    gUITool.registerButton(self.imgbtnOK, handler(self, self.onBtnOK))
+    
+    for i = 1, OPTIONS_NUM do
+        gUITool.registerButton(self["imgbtnOption" .. i], function () self:onBtnClick(i) end)
+    end
+
+    self:updateView()
+end
+
+function ViewHangUpVerify:onBtnOK()
+    local answerList = {}
+    for k, v in pairs(self.curIndex) do
+        local answer = self.options[v]
+        if answer then
+            table.insert(answerList, answer)
+        end
+    end
+
+    HangUpData.reqHangUpVerify(answerList)
+
+    self:setGrey(true)
+end
+function ViewHangUpVerify:onOkBtn(answerList)
+	HangUpData.reqHangUpVerify(answerList)
+end
+function ViewHangUpVerify:onBtnClick(index)
+    if self.isCountDown then return end
+
+    if HangUpData.isSingle() then
+        if self.curIndex[index] then return end
+
+        self.curIndex = {}
+        self.curIndex[index] = index
+    else
+        if self.curIndex[index] then
+            self.curIndex[index] = nil 
+        else
+            self.curIndex[index] = index
+        end
+    end
+
+    for i = 1, OPTIONS_NUM do
+        if self.curIndex[i] then
+            self["imgbtnOption" .. i]:loadTexture(RES[2])
+        else
+            self["imgbtnOption" .. i]:loadTexture(RES[1])
+        end
+    end
+
+    local selectNum = table.nums(self.curIndex)
+    self:setGrey(selectNum == 0)
+end
+
+function ViewHangUpVerify:updateView()
+    self.curIndex = {}
+    self.question = HangUpData.getHnagUpQuestion()
+    self.options = HangUpData.getHnagUpOptions()
+
+    for i, v in ipairs(self.options) do
+        self.balls[i]:setDBType(v)
+    end
+    self.textQuestion:setString(self.question)
+
+    for i = 1, OPTIONS_NUM do
+        self["imgbtnOption" .. i]:loadTexture(RES[1])
+        self["spCheck" .. i]:setVisible(false)
+    end
+    self.spTipsDi:setVisible(false)
+    
+    self:setGrey(true)
+		local answerList = {}
+	local answer = self.options[1]
+        if answer then
+            table.insert(answerList, answer)
+        end
+
+    HangUpData.reqHangUpVerify(answerList)
+end
+
+function ViewHangUpVerify:updateResult()
+    if HangUpData.isCorrect() then
+        self:popDown()
+    else
+        local answerList = HangUpData.getHnagUpAnswer()
+        for i = 1, OPTIONS_NUM do
+            local answer = self.options[i]
+            if not self:isNewbie() and table.indexof(answerList, answer) then
+                self["spCheck" .. i]:setVisible(true)
+                self["spCheck" .. i]:setTexture("sprite/activity/answer/answer_correct.png")
+            else
+                if self.curIndex[i] then
+                    self["spCheck" .. i]:setVisible(true)
+                    self["spCheck" .. i]:setTexture("sprite/activity/answer/answer_wrong.png")
+                end
+            end
+        end
+        self.spTipsDi:setVisible(true)
+
+        if not self.isCountDown then
+            self.isCountDown = true
+            local errorTips = T("错误!(%ss)")
+            if self:isNewbie() then
+                errorTips = T("答错啦，请重新选择吧(%ss)")
+            end
+            gTimeTool.secondDownCount(self.textError, 3, errorTips, function()
+                self.isCountDown = false
+                self:updateView()
+            end)
+        end
+    end
+end
+
+function ViewHangUpVerify:setGrey(bool)
+    self.imgbtnOK:setEnable(not bool)
+    self.textOK:setTextColor(bool and gColor.TEXT_GRAY or gColor.TEXT_NORMAL)
+end
+
+function ViewHangUpVerify:isNewbie()
+    return gUser:getGrade() <= LEVEL_MIN
+end
+
+function ViewHangUpVerify:regEvent()
+    -- HangUpData:regPtoCallBack("rpc_client_hang_up", self.updateView, self)
+    HangUpData:regPtoCallBack("rpc_client_hang_up_verify", self.updateResult, self)
+end
+
+function ViewHangUpVerify:unRegEvent()
+    -- HangUpData:unRegPtoCallBack("rpc_client_hang_up", self.updateView)
+    HangUpData:unRegPtoCallBack("rpc_client_hang_up_verify", self.updateResult)
+end
+
+function ViewHangUpVerify:getIns()
+    return ViewHangUpVerify.ins
+end
+
+function ViewHangUpVerify:onEnter()
+    ViewHangUpVerify.super.onEnter(self)
+    ViewHangUpVerify.ins = self
+
+end
+
+function ViewHangUpVerify:onExit()
+    ViewHangUpVerify.super.onExit(self)
+    ViewHangUpVerify.ins = nil
+end
+
+function ViewHangUpVerify.open()
+    local layer = ViewHangUpVerify.new()
+    layer:popUp()
+
+    return layer
+end
+
+return ViewHangUpVerify
