@@ -50,7 +50,8 @@ var gameData = {
         ],
         killBall: [
             35,
-            16
+            16,
+            53
         ],
         // 参考文件 - battle_const.luac
         DragonBallUpgradeCost: {
