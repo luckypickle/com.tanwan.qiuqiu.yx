@@ -51,12 +51,26 @@ app.get('/watchAD',function(req, res){
 
 })
 
+app.get('/watchCoAD',function(req, res){
+    CACHE.postData.push('server.rpc_server_video_ads_click_watch(3,0);');
+    res.send("success");
+
+})
+
 app.get('/openBox',function(req,res){
 
-    CACHE.openCount += parseInt(req.query.count);
+    CACHE.openCount = parseInt(req.query.count);
 
     res.send('success');
 })
+
+
+app.get('/cleanBox',function(req,res){
+
+    CACHE.boxReward={}
+    res.send('success');
+})
+
 
 
 app.get('/autoWatch',function(req,res){
