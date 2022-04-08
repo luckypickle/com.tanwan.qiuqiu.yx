@@ -212,7 +212,7 @@ CACHE.getBallMergeId = function(ballId, isKillBall,is_skip) {
                     return false;
                 }
                 //三星以上光棱不对合
-                if ((mergeFromObj.pos in [0,5,9,10,11,12,13,14,4]) && mergeFromObj.ballType == 66 && ballItem.ballType ==66 && ballItem.star>=3){
+                if ([0,5,9,10,11,12,13,14,4].includes(mergeFromObj.pos  ) && mergeFromObj.ballType == 66 && ballItem.ballType ==66 && ballItem.star>=3){
                     return false;
                 }
                 //四星升星不合暗杀
