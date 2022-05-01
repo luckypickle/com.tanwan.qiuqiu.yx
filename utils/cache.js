@@ -24,6 +24,7 @@ var CACHE = {
     'arenaData': {}, // 竞技场数据
     'userInfo': {}, // 用户信息
     'loginInfo': {}, // 登录信息
+    'stopMerge':false,
     // 对局信息
     'battle': {
         /*BattleConst.BossType = {
@@ -73,6 +74,7 @@ var CACHE = {
         'getRewardAdvertType': 4,  // 支援宝箱
         'missionAdvertType': 5,  // 任务
         'legionContributeAdvertType': 6,  // 球队捐献广告
+        'qiushop':7,//球币商店广告   13 抽奖活动广告
         'miaoshoudianjin':14,//妙手点金广告
         'shopAdvertLimit': false, // 商店广告限制
         'hasVideoAdsBuff': false, // 竞技BUFF
@@ -393,7 +395,7 @@ CACHE.getUnMergeBallId = function(ballId) {
     return mergeToObj;
 };
 
-CACHE.getKillBallMergeId =function(ballId) {
+CACHE.getKillBallMergeId =function(ballId,is_forbid) {
     var mergeFromObj = CACHE.getBallById(ballId);
     var mergeFromObjIsKillBall = gameData.BattleConst.killBall.includes(mergeFromObj.ballType); // 合并球球是否万能球球
     var mergeToObj = null;
@@ -402,6 +404,9 @@ CACHE.getKillBallMergeId =function(ballId) {
 
     // 不合并 - 七星球球
     if(mergeFromObj.star >= 7) {
+        return;
+    }
+    if(is_forbid>0&& ballItem.star>=4){
         return;
     }
     // 成长球球 非暗杀模式，还是会尝试抢救！32.成长 44.复制

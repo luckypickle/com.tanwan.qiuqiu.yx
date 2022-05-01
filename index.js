@@ -57,6 +57,19 @@ app.get('/watchCoAD',function(req, res){
 
 })
 
+app.get('/watchqiuAD',function(req, res){
+    CACHE.postData.push('server.rpc_server_video_ads_click_watch(7,0);');
+    res.send("success");
+
+})
+app.get('/watchADBy',function(req,res){
+
+    type = req.query.type;
+    CACHE.postData.push('server.rpc_server_video_ads_click_watch('+type+',0);');
+
+    res.send('success');
+})
+
 app.get('/openBox',function(req,res){
 
     CACHE.openCount = parseInt(req.query.count);
@@ -103,3 +116,12 @@ app.get('/stopautoWatchTeam',function(req,res){
 app.get('/question',function(req,res){
     res.send(CACHE.verifyCache);
 })
+app.get('/stopmerge',function(req,res){
+    CACHE.stopMerge = true;
+    res.send('success');
+})
+app.get('/startmerge',function(req,res){
+    CACHE.stopMerge = false;
+    res.send('success');
+})
+
